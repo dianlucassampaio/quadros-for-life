@@ -1,0 +1,23 @@
+# Arquivos sensíveis
+.env
+*.env
+application-dev.properties
+
+# Pastas de IDE e Compiladores
+.vscode/
+.idea/
+target/
+*.class
+
+# Pastas e arquivos da Inteligência Artificial
+skills/
+workflows/
+rules/
+gemini.md
+HELP.md
+.gemini.md
+
+# Logs e arquivos de SO
+*.log
+*.sqlite
+.DS_Store

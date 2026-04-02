@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quadros for Life | ERP Kanban</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Moderno / UI UX Premium */
+        :root {
+            --bg: #f3f4f6;
+            --surface: #ffffff;
+            --text-main: #1f2937;
+            --text-light: #6b7280;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --border: #e5e7eb;
+            --column-bg: #f9fafb;
+            --color-atendimento: #3b82f6;
+            --color-faturamento: #10b981;
+            --color-producao: #f59e0b;
+            --color-expedicao: #8b5cf6;
+            --color-entrega: #6b7280;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-main); margin: 0; padding: 0; display:flex; flex-direction:column; height: 100vh; }
+        header { background: var(--surface); padding: 20px 40px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 24px; color: var(--primary); }
+        .btn-add { background-color: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-add:hover { background-color: var(--primary-hover); }
+        
+        /* Quadro Kanban */
+        .kanban-board { display: flex; gap: 20px; padding: 20px; overflow-x: auto; flex-grow: 1; align-items:flex-start; }
+        .column { background: var(--column-bg); border-radius: 12px; width: 300px; min-width: 300px; padding: 16px; border: 1px solid var(--border); display:flex; flex-direction:column; height: calc(100vh - 120px); border-top: 4px solid var(--primary); }
+        .col-atendimento { border-top-color: var(--color-atendimento); }
+        .col-faturamento { border-top-color: var(--color-faturamento); }
+        .col-producao { border-top-color: var(--color-producao); }
+        .col-expedicao { border-top-color: var(--color-expedicao); }
+        .col-entrega { border-top-color: var(--color-entrega); }
+        
+        .column-title { font-weight: 600; margin-bottom: 16px; font-size: 14px; text-transform: uppercase; color: var(--text-light); }
+        .cards { flex-grow: 1; overflow-y: auto; display:flex; flex-direction:column; gap:12px; min-height:100px; }
+        
+        .card { background: var(--surface); padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: grab; border-left: 4px solid var(--primary); transition: transform 0.1s;}
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card:active { cursor: grabbing; opacity: 0.7; }
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-light); }
+        .card-title { font-weight: 700; margin-bottom: 8px; font-size:16px;}
+        .card-price { color: #10b981; font-weight: 700; font-size: 14px; }
+        
+        /* Modal Popup */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); justify-content: center; align-items: center; z-index: 50; }
+        .modal-content { background: var(--surface); padding: 30px; border-radius: 12px; width: 500px; max-width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color:var(--text-light); }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family:inherit; transition: 0.2s;}
+        input:focus, select:focus { outline:none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+        .form-row { display: flex; gap: 10px; }
+        .items-list { background: var(--bg); padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; border: 1px dashed var(--border);}
+        .total-display { font-size: 24px; font-weight: 700; color: #10b981; margin: 20px 0; text-align:right;}
+        .btn-close { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 10px 20px; border-radius: 8px; cursor:pointer; font-weight:600;}
+        .btn-close:hover { background: #f3f4f6; }
+        
+        /* Checkbox OK Animada */
+        .ok-checkbox { margin-left: 8px; cursor: pointer; accent-color: #10b981; width:16px; height:16px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Quadros for Life <span style="font-weight:400; color:var(--text-light); font-size:16px;">| ERP de Produção</span></h1>
+        <button class="btn-add" onclick="abrirModal()">+ Nova Ordem de Produção</button>
+    </header>
+
+    <div class="kanban-board" id="board">
+        <div class="column col-atendimento" ondrop="drop(event, 'ATENDIMENTO')" ondragover="allowDrop(event)">
+            <div class="column-title" style="color:var(--color-atendimento)">1. Atendimento</div><div class="cards" id="ATENDIMENTO"></div>
+        </div>
+        <div class="column col-faturamento" ondrop="drop(event, 'FATURAMENTO')" ondragover="allowDrop(event)">
+            <div class="column-title" style="color:var(--color-faturamento)">2. Faturamento</div><div class="cards" id="FATURAMENTO"></div>
+        </div>
+        <div class="column col-producao" ondrop="drop(event, 'PRODUCAO')" ondragover="allowDrop(event)">
+            <div class="column-title" style="color:var(--color-producao)">3. Produção</div><div class="cards" id="PRODUCAO"></div>
+        </div>
+        <div class="column col-expedicao" ondrop="drop(event, 'EXPEDICAO')" ondragover="allowDrop(event)">
+            <div class="column-title" style="color:var(--color-expedicao)">4. Expedição</div><div class="cards" id="EXPEDICAO"></div>
+        </div>
+        <div class="column col-entrega" ondrop="drop(event, 'ENTREGA')" ondragover="allowDrop(event)">
+            <div class="column-title" style="color:var(--color-entrega)">5. Entrega</div><div class="cards" id="ENTREGA"></div>
+        </div>
+    </div>
+
+    <!-- Modal Nova OP (Simulação Carrinho PDV) -->
+    <div class="modal" id="modalOP">
+        <div class="modal-content">
+            <h2 style="margin-top:0; color:var(--text-main);">Cadastrar O.P.</h2>
+            
+            <div class="form-group">
+                <label>1. Cadastrar novo cliente ou usar existente</label>
+                <div class="form-row">
+                    <input type="text" id="tel" placeholder="Telefone... ex: (11) 99999-9999">
+                    <button type="button" onclick="buscarCliente()" class="btn-close">Buscar</button>
+                    <button type="button" onclick="toggleListaClientes()" class="btn-close">Ver Lista ▾</button>
+                </div>
+                <!-- Box expansível da lista de clientes -->
+                <div id="listaClientesBox" style="display:none; margin-top:10px; max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:6px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;" id="tabelaClientes">
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <input type="hidden" id="clienteId">
+            <div class="form-group"><input type="text" id="nome" placeholder="Nome do Cliente"></div>
+            <div class="form-group"><input type="email" id="email" placeholder="E-mail"></div>
+            <div class="form-group"><input type="text" id="endereco" placeholder="Endereço de Entrega completo"></div>
+            
+            <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+            
+            <label>2. Carrinho de Quadros</label>
+            <div class="form-row form-group">
+                <div style="flex:1">
+                    <select id="tamanho"><option value="A4">A4 (R$ 30,00)</option><option value="A3">A3 (R$ 50,00)</option></select>
+                </div>
+                <div style="flex:2">
+                    <select id="moldura"><option value="ALUMINIO">Alumínio (R$ 50,00)</option><option value="MADEIRA_BRANCA">Mad. Branca (R$ 100,00)</option><option value="MADEIRA_PRETA">Mad. Preta (R$ 100,00)</option></select>
+                </div>
+                <div style="flex:1"><input type="number" id="qtd" value="1" min="1"></div>
+            </div>
+            <button class="btn-close" style="width:100%; border-style:dashed; margin-bottom:10px;" onclick="adicionarItem()">+ Inserir Quadro na O.P.</button>
+            <div class="items-list" id="lista-carrinho">O carrinho está vazio.</div>
+            
+            <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+
+            <label>3. Faturamento</label>
+            <div class="form-row form-group">
+                <div style="flex:1">
+                    <!-- Repare que chamamos atualizarTotalTudo sempre que o pagamento muda para aplicar juros! -->
+                    <select id="pagamento" onchange="atualizarTotalTudo()">
+                        <optgroup label="À Vista">
+                            <option value="A_VISTA_PIX">Pix</option>
+                            <option value="A_VISTA_DINHEIRO">Dinheiro</option>
+                            <option value="A_VISTA_DEBITO">Débito</option>
+                            <option value="A_VISTA_BOLETO">Boleto (À vista)</option>
+                        </optgroup>
+                        <optgroup label="Parcelado">
+                            <option value="PARCELADO_CARTAO">Cartão de Crédito</option>
+                            <option value="PARCELADO_BOLETO">Boleto Bancário</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div style="flex:1">
+                    <input type="number" id="parcelas" value="1" min="1" max="12" onchange="atualizarTotalTudo()" title="Qtd de Parcelas">
+                </div>
+            </div>
+            
+            <div class="total-display">R$ <span id="total-estimado">0.00</span></div>
+            <div id="detalhe-parcela" style="font-size:14px; color:var(--text-light); text-align:right; margin-top:-15px; margin-bottom:20px; min-height:16px; font-weight:600;"></div>
+            
+            <div style="display:flex; justify-content:space-between; margin-top:20px;">
+                <button class="btn-close" onclick="fecharModal()">Cancelar</button>
+                <button class="btn-add" onclick="salvarOP()">Aprovar O.P.</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Motores da Matrix Javascript -->
+    <script>
+        let itensCarrinho = [];
+
+        function abrirModal() {
+            document.getElementById('modalOP').style.display = 'flex';
+            document.getElementById('clienteId').value = '';
+            document.getElementById('nome').value = '';
+            document.getElementById('tel').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('endereco').value = '';
+            itensCarrinho = [];
+            atualizarCarrinhoUI();
+        }
+        function fecharModal() { document.getElementById('modalOP').style.display = 'none'; }
+
+        function buscarCliente() {
+            const tel = document.getElementById('tel').value;
+            fetch('/clientes/buscar/' + tel)
+                .then(r => r.text())
+                .then(text => {
+                    if(text) {
+                        const c = JSON.parse(text);
+                        preencherFormCliente(c.id, c.nome, c.telefone, c.email, c.endereco);
+                        alert("🎉 Cliente Recorrente encontrado!");
+                    } else {
+                        alert("Telefone novo. Pode preencher os dados para um novo cadastro!");
+                    }
+                });
+        }
+
+        // --- Expansão Lista de Clientes ---
+        function toggleListaClientes() {
+            const box = document.getElementById('listaClientesBox');
+            if (box.style.display === 'none') {
+                box.style.display = 'block';
+                fetch('/clientes')
+                    .then(r => r.json())
+                    .then(clientes => {
+                        const tbody = document.querySelector('#tabelaClientes tbody');
+                        if (clientes.length === 0) {
+                            tbody.innerHTML = '<tr><td style="padding:10px;">Nenhum cliente cadastrado ainda.</td></tr>';
+                        } else {
+                            tbody.innerHTML = clientes.map(c => `
+                                <tr style="border-bottom:1px solid #e5e7eb; cursor:pointer;" onclick="preencherFormCliente(${c.id}, '${c.nome}', '${c.telefone}', '${c.email}', '${c.endereco}')">
+                                    <td style="padding:10px;"><strong>${c.nome}</strong><br><span style="color:#6b7280">${c.telefone || 'S/ Tel'}</span></td>
+                                    <td style="padding:10px; text-align:right;"><button class="btn-close" style="padding:4px 8px; font-size:12px;">Selecionar</button></td>
+                                </tr>
+                            `).join('');
+                        }
+                    });
+            } else {
+                box.style.display = 'none';
+            }
+        }
+
+        function preencherFormCliente(id, nome, telefone, email, endereco) {
+            document.getElementById('clienteId').value = id || '';
+            document.getElementById('nome').value = nome || '';
+            document.getElementById('tel').value = telefone || '';
+            document.getElementById('email').value = email || '';
+            document.getElementById('endereco').value = endereco || '';
+            document.getElementById('listaClientesBox').style.display = 'none';
+        }
+
+        // Adiciona quadros visuais no form
+        function adicionarItem() {
+            const tam = document.getElementById('tamanho').value;
+            const mol = document.getElementById('moldura').value;
+            const qtd = parseInt(document.getElementById('qtd').value);
+            
+            // Calcula o preco unitario local para exibicao (igual o back faz)
+            let precoUnitario = 0;
+            if(tam === 'A3') precoUnitario += 50; else precoUnitario += 30;
+            if(mol.includes('MADEIRA')) precoUnitario += 100; else precoUnitario += 50;
+            
+            itensCarrinho.push({ tamanho: tam, tipoMoldura: mol, quantidade: qtd, precoUnitario: precoUnitario });
+            atualizarCarrinhoUI();
+        }
+
+        function atualizarCarrinhoUI() {
+            const div = document.getElementById('lista-carrinho');
+            if(itensCarrinho.length === 0) { div.innerHTML = 'Nenhum quadro adicionado.'; }
+            else {
+                div.innerHTML = itensCarrinho.map((it) => 
+                    `<div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span>${it.quantidade}x Quadro ${it.tamanho} <span style="font-size:12px;color:var(--text-light)">${it.tipoMoldura.replace('_',' ')}</span></span>
+                        <span style="color:var(--text-light); font-weight:600;">R$ ${(it.precoUnitario * it.quantidade).toFixed(2)}</span>
+                    </div>`
+                ).join('');
+            }
+            atualizarTotalTudo(); // Recalcula o total sempre que colocar um no carrinho
+        }
+
+        // Simula no VisualHTML a exata conta que o SpringBoot Service fará no Banco!
+        function atualizarTotalTudo() {
+            let soma = 0;
+            itensCarrinho.forEach(it => {
+                soma += (it.precoUnitario * it.quantidade);
+            });
+            const pag = document.getElementById('pagamento').value;
+            const par = parseInt(document.getElementById('parcelas').value);
+            if(pag.startsWith('PARCELADO') && par >= 5) {
+                soma = soma * 1.032; // Juros de verdade 3.2%
+            }
+            document.getElementById('total-estimado').innerText = soma.toFixed(2);
+            
+            const divParcela = document.getElementById('detalhe-parcela');
+            if(par > 1) {
+                const valorParcelado = soma / par;
+                divParcela.innerText = `(${par}x de R$ ${valorParcelado.toFixed(2)})`;
+            } else {
+                divParcela.innerText = '';
+            }
+        }
+
+        // Manda o pacotasso de informações mastigadas para o nosso Java Salvar e calcular oficial.
+        function salvarOP() {
+            if(itensCarrinho.length === 0) { alert("Adicione quadros na OP!"); return; }
+            if(!document.getElementById('nome').value) { alert("Nome obrigatório!"); return; }
+
+            // Monta o Cliente
+            const cliente = {
+                nome: document.getElementById('nome').value,
+                telefone: document.getElementById('tel').value,
+                email: document.getElementById('email').value,
+                endereco: document.getElementById('endereco').value
+            };
+            const cId = document.getElementById('clienteId').value;
+            if(cId) cliente.id = parseInt(cId);
+
+            // Monta a Ordem de Produção Completa (Anexando o cliente e o carrinho nela)
+            const op = {
+                cliente: cliente,
+                canalAtendimento: 'BALCAO', 
+                formaPagamento: document.getElementById('pagamento').value,
+                parcelas: parseInt(document.getElementById('parcelas').value),
+                itens: itensCarrinho
+            };
+
+            // Conversa com nossa API do OrdemProducaoController
+            fetch('/ops', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(op)
+            }).then(r => r.json()).then(novaOp => {
+                alert("✨ O.P. #" + novaOp.id + " faturada com sucesso no valor de R$" + novaOp.valorTotal);
+                fecharModal();
+                carregarKanban(); // Atualiza a tela Drag and Drop
+            });
+        }
+
+        function carregarKanban() {
+            ['ATENDIMENTO','FATURAMENTO','PRODUCAO','EXPEDICAO','ENTREGA'].forEach(id => {
+                document.getElementById(id).innerHTML = '';
+            });
+
+            fetch('/ops') // Puxa as OPs do banco de dados (GET)
+                .then(r => r.json())
+                .then(ops => {
+                    ops.forEach(op => {
+                        const col = document.getElementById(op.etapaAtual || 'ATENDIMENTO');
+                        if (col) {
+                            const totalQuadros = op.itens ? op.itens.reduce((acc, it) => acc + it.quantidade, 0) : 0;
+                            // Cor da borda
+                            let corBorda = 'var(--primary)';
+                            if(op.etapaAtual === 'ATENDIMENTO') corBorda = 'var(--color-atendimento)';
+                            if(op.etapaAtual === 'FATURAMENTO') corBorda = 'var(--color-faturamento)';
+                            if(op.etapaAtual === 'PRODUCAO') corBorda = 'var(--color-producao)';
+                            if(op.etapaAtual === 'EXPEDICAO') corBorda = 'var(--color-expedicao)';
+                            if(op.etapaAtual === 'ENTREGA') corBorda = 'var(--color-entrega)';
+                            
+                            const chkChecked = op.etapaOk ? 'checked' : '';
+                            const codShow = op.codigoRastreio ? op.codigoRastreio : '#OP-'+op.id;
+                            
+                            let formatoPtBr = op.formaPagamento || 'S/N';
+                            formatoPtBr = formatoPtBr.replace(/_/g, ' '); // Tira os underlines da visualização
+                            
+                            // Cria as cartinhas HTML
+                            col.innerHTML += `
+                                <div class="card" style="border-left-color: ${corBorda}; position: relative;" draggable="true" ondragstart="drag(event, ${op.id})" id="card-${op.id}">
+                                    <div style="position:absolute; top:8px; right:8px; display:flex; gap:8px;">
+                                        <button onclick="excluirOP(${op.id})" title="Excluir O.P." style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px;">🗑️</button>
+                                    </div>
+                                    <div class="card-header" style="margin-right:25px;">
+                                        <span style="background:var(--bg); padding:2px 6px; border-radius:4px; font-weight:700; color:var(--primary); font-family:monospace; font-size:14px;">${codShow}</span>
+                                        <span style="font-size:11px; text-transform:capitalize;">${formatoPtBr.toLowerCase()} (${op.parcelas}x)</span>
+                                    </div>
+                                    <div class="card-title">${op.cliente ? op.cliente.nome : 'S/N'}</div>
+                                    <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">${totalQuadros} quadro(s) encomendado(s)</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <div class="card-price">R$ ${op.valorTotal ? op.valorTotal.toFixed(2) : '0.00'}</div>
+                                        <label title="Marcar etapa como pronta" onclick="event.stopPropagation();">
+                                            <span style="font-size:11px; font-weight:bold; color:#6b7280">OK?</span>
+                                            <input type="checkbox" class="ok-checkbox" ${chkChecked} onchange="toggleOk(event, ${op.id})">
+                                        </label>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                });
+        }
+
+        // --- Lógica Avançada HTML5 Drag and Drop e OK ---
+        function toggleOk(ev, opId) {
+            const isOk = ev.target.checked;
+            fetch('/ops/' + opId + '/ok', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ok: isOk})
+            }).then(r => {
+                if(!r.ok) alert("Erro ao marcar etapa OK");
+            });
+        }
+
+        // --- Botão Excluir O.P ---
+        function excluirOP(opId) {
+            if(confirm("Tem certeza que deseja apagar essa O.P permanentemente?")) {
+                fetch('/ops/' + opId, {
+                    method: 'DELETE'
+                }).then(r => {
+                    if(r.ok) carregarKanban();
+                    else alert("Erro ao excluir!");
+                })
+            }
+        }
+
+        function drag(ev, opId) {
+            ev.dataTransfer.setData("opId", opId); // Guarda o ID no momento do clique (drag)
+        }
+        function allowDrop(ev) {
+            ev.preventDefault(); // Necessário por padrão da internet para permitir drop
+        }
+        function drop(ev, novaEtapa) {
+            ev.preventDefault();
+            const opId = ev.dataTransfer.getData("opId");
+            
+            // Fazemos o verbo PUT (Atualizar no banco) passando a etapa para onde ele soltou (Drop)
+            fetch('/ops/' + opId + '/etapa', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({novaEtapa: novaEtapa})
+            }).then(async r => {
+                if(!r.ok) { // Cai aqui se nossa trava de Segurança do Java recusar!
+                    const data = await r.json();
+                    alert(data.erro || "Erro de validação no Servidor Java!");
+                }
+                carregarKanban(); // Atualiza a tela para confirmar de deu certo
+            });
+        }
+
+        window.onload = carregarKanban; // Carregar o Kanban logo que abre o Google Chrome
+    </script>
+</body>
+</html>

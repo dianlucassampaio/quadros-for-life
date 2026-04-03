@@ -25,8 +25,8 @@
         .btn-close:hover { background: #f3f4f6; }
         
         /* Quadro Kanban Item 5 (Responsivo) */
-        .kanban-board { display: flex; gap: 20px; padding: 20px; margin: 20px; flex-grow: 1; align-items: flex-start; background: var(--surface); border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .column { background: var(--column-bg); border-radius: 12px; flex: 1; min-width: 150px; padding: 16px; border: 1px solid var(--border); display:flex; flex-direction:column; min-height: 200px; height: max-content; border-top: 4px solid var(--primary); transition: all 0.3s ease; }
+        .kanban-board { display: flex; gap: 20px; padding: 20px; margin: 20px; flex-grow: 1; align-items: stretch; background: var(--surface); border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .column { background: var(--column-bg); border-radius: 12px; flex: 1; min-width: 150px; padding: 16px; border: 1px solid var(--border); display:flex; flex-direction:column; min-height: 200px; height: auto; border-top: 4px solid var(--primary); transition: all 0.3s ease; }
         .col-atendimento { border-top-color: var(--color-atendimento); }
         .col-faturamento { border-top-color: var(--color-faturamento); }
         .col-producao { border-top-color: var(--color-producao); }
@@ -175,7 +175,7 @@
     </div>
 
     <!-- Modal Detalhes OP -->
-    <div class="modal" id="modalDetalhes">
+    <div class="modal" id="modalDetalhes" style="z-index: 60;">
         <div class="modal-content">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 style="margin:0; color:var(--text-main);" id="detalhe-titulo">Detalhes da OP</h2>
@@ -294,13 +294,21 @@
             atualizarCarrinhoUI();
         }
 
+        function removerDoCarrinho(index) {
+            itensCarrinho.splice(index, 1);
+            atualizarCarrinhoUI();
+        }
+
         function atualizarCarrinhoUI() {
             const div = document.getElementById('lista-carrinho');
             if(itensCarrinho.length === 0) div.innerHTML = 'O carrinho está vazio.';
-            else div.innerHTML = itensCarrinho.map((it) => 
+            else div.innerHTML = itensCarrinho.map((it, idx) => 
                 `<div style="display:flex; justify-content:space-between; margin-bottom:6px; padding:4px 0; border-bottom: 1px dotted var(--border);">
                     <span>${it.quantidade}x <strong>${it.descricaoFina}</strong> <span style="font-size:11px; color:var(--text-light)">(R$ ${it.valorUnitario.toFixed(2)})</span></span>
-                    <span style="color:var(--text-light); font-weight:600;">R$ ${(it.valorUnitario * it.quantidade).toFixed(2)}</span>
+                    <div>
+                        <span style="color:var(--text-light); font-weight:600; margin-right:10px;">R$ ${(it.valorUnitario * it.quantidade).toFixed(2)}</span>
+                        <button onclick="removerDoCarrinho(${idx})" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer;" title="Remover item">✕</button>
+                    </div>
                 </div>`
             ).join('');
             atualizarTotalTudo();
@@ -328,7 +336,8 @@
             const lblPrazo = document.getElementById('prazo-dias');
             if(totalQuadros === 0) { lblPrazo.innerText = '0 dias'; lblPrazo.style.color = 'var(--text-light)'; }
             else if (totalQuadros <= 4) { lblPrazo.innerText = 'Até 4 dias úteis'; lblPrazo.style.color = 'var(--color-faturamento)'; }
-            else { lblPrazo.innerText = 'Até 6 dias úteis'; lblPrazo.style.color = 'var(--color-producao)'; }
+            else if (totalQuadros < 10) { lblPrazo.innerText = 'Até 6 dias úteis'; lblPrazo.style.color = 'var(--color-producao)'; }
+            else { lblPrazo.innerText = 'Até 10 dias úteis'; lblPrazo.style.color = 'var(--color-expedicao)'; }
         }
 
         function salvarOP() {
@@ -346,7 +355,9 @@
             if(cId) cliente.id = parseInt(cId);
 
             let totalQuadros = itensCarrinho.reduce((a, it) => a + it.quantidade, 0);
-            let prazoParaJava = totalQuadros <= 4 ? 4 : 6;
+            let prazoParaJava = 6;
+            if (totalQuadros <= 4) prazoParaJava = 4;
+            else if (totalQuadros >= 10) prazoParaJava = 10;
 
             // Calcula Data Corretamente (Evita erro de Timezone no Banco)
             let dt = new Date();
@@ -399,11 +410,13 @@
                         col.innerHTML += `
                             <div class="card" style="border-left-color: ${corBorda}; position: relative;" draggable="true" ondragstart="drag(event, ${op.id})" id="card-${op.id}" onclick="abrirDetalhesOP(${op.id})">
                                 <div style="position:absolute; top:8px; right:8px; display:flex;">
-                                    <button onclick="event.stopPropagation(); excluirOP(${op.id})" title="Apagar O.P" style="background:none; border:none; color:#ef4444; cursor:pointer;">🗑️</button>
+                                    <button onclick="event.stopPropagation(); excluirOP(${op.id})" title="Apagar O.P permanentemente" style="background:none; border:none; color:#ef4444; cursor:pointer;" aria-label="Apagar OP">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#ef4444;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                    </button>
                                 </div>
-                                <div class="card-header" style="margin-right:25px;">
+                                <div class="card-header" style="margin-right:25px; display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
                                     <span style="background:var(--bg); padding:2px 6px; border-radius:4px; font-weight:700; color:var(--primary); font-family:monospace; font-size:14px;">${codShow}</span>
-                                    <span style="font-size:11px; text-transform:capitalize;">${formatoPtBr.toLowerCase()} (${op.parcelas}x)</span>
+                                    <span style="font-size:11px; text-transform:capitalize; font-weight:600; color:var(--text-light);">${formatoPtBr.toLowerCase()} (${op.parcelas}x)</span>
                                 </div>
                                 <div class="card-title">${op.cliente ? op.cliente.nome : 'S/N'}</div>
                                 <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">${totalQuadros} quadros</div>
@@ -413,11 +426,11 @@
                                     📅 Prazo / Entrega: <strong style="color:var(--primary)">${textoPrazo}</strong>
                                 </div>
 
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="display:flex; flex-direction:column; gap:8px;">
                                     <div class="card-price">R$ ${op.valorTotal ? op.valorTotal.toFixed(2) : '0.00'}</div>
-                                    <label title="Marcar concluído para a OP sumir daqui" onclick="event.stopPropagation();">
-                                        <span style="font-size:11px; font-weight:bold; color:#6b7280">OK?</span>
-                                        <input type="checkbox" class="ok-checkbox" ${op.etapaOk ? 'checked' : ''} onchange="toggleOk(event, ${op.id})">
+                                    <label onclick="event.stopPropagation();" style="display:flex; align-items:center; cursor:pointer;" title="Marcar esta etapa como finalizada">
+                                        <input type="checkbox" class="ok-checkbox" style="margin:0 6px 0 0;" ${op.etapaOk ? 'checked' : ''} onchange="toggleOk(event, ${op.id})">
+                                        <span style="font-size:12px; font-weight:700; color:var(--text-main)">Concluir</span>
                                     </label>
                                 </div>
                             </div>
@@ -508,7 +521,7 @@
                             const sobra = diaOps.slice(2);
                             cardsHtml = topo.map(renderCard).join('') + 
                                 `<details>
-                                    <summary class="btn-summary">▼ Mais ${sobra.length} entrega(s)</summary>
+                                    <summary class="btn-summary" title="Ver mais entregas">▼</summary>
                                     ${sobra.map(renderCard).join('')}
                                  </details>`;
                         }

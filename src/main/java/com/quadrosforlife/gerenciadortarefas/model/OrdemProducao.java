@@ -25,6 +25,9 @@ public class OrdemProducao {
     private Boolean etapaOk;
     private String codigoRastreio;
 
+    private String dataEntregaEstimada;
+    private String observacaoCalendario;
+
     // Construtor obrigatorio
     public OrdemProducao() {
     }
@@ -109,4 +112,9 @@ public class OrdemProducao {
     public void setCodigoRastreio(String codigoRastreio) {
         this.codigoRastreio = codigoRastreio;
     }
+
+    public String getDataEntregaEstimada() { return dataEntregaEstimada; }
+    public void setDataEntregaEstimada(String dataEntregaEstimada) { this.dataEntregaEstimada = dataEntregaEstimada; }
+    public String getObservacaoCalendario() { return observacaoCalendario; }
+    public void setObservacaoCalendario(String observacaoCalendario) { this.observacaoCalendario = observacaoCalendario; }
 }

@@ -29,8 +29,8 @@
         .btn-add:hover { background-color: var(--primary-hover); }
         
         /* Quadro Kanban */
-        .kanban-board { display: flex; gap: 20px; padding: 20px; overflow-x: auto; flex-grow: 1; align-items:flex-start; }
-        .column { background: var(--column-bg); border-radius: 12px; width: 300px; min-width: 300px; padding: 16px; border: 1px solid var(--border); display:flex; flex-direction:column; height: calc(100vh - 120px); border-top: 4px solid var(--primary); }
+        .kanban-board { display: flex; gap: 20px; padding: 20px; margin: 40px; overflow-x: auto; flex-grow: 1; align-items: flex-start; background: var(--surface); border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .column { background: var(--column-bg); border-radius: 12px; width: 320px; min-width: 320px; padding: 16px; border: 1px solid var(--border); display:flex; flex-direction:column; min-height: 200px; height: max-content; border-top: 4px solid var(--primary); transition: all 0.3s ease; }
         .col-atendimento { border-top-color: var(--color-atendimento); }
         .col-faturamento { border-top-color: var(--color-faturamento); }
         .col-producao { border-top-color: var(--color-producao); }
@@ -40,8 +40,8 @@
         .column-title { font-weight: 600; margin-bottom: 16px; font-size: 14px; text-transform: uppercase; color: var(--text-light); }
         .cards { flex-grow: 1; overflow-y: auto; display:flex; flex-direction:column; gap:12px; min-height:100px; }
         
-        .card { background: var(--surface); padding: 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: grab; border-left: 4px solid var(--primary); transition: transform 0.1s;}
-        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card { background: var(--surface); padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: grab; border-left: 4px solid var(--primary); transition: transform 0.2s, min-height 0.3s; min-height: 120px;}
+        .card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
         .card:active { cursor: grabbing; opacity: 0.7; }
         .card-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-light); }
         .card-title { font-weight: 700; margin-bottom: 8px; font-size:16px;}
@@ -67,7 +67,10 @@
 <body>
     <header>
         <h1>Quadros for Life <span style="font-weight:400; color:var(--text-light); font-size:16px;">| ERP de Produção</span></h1>
-        <button class="btn-add" onclick="abrirModal()">+ Nova Ordem de Produção</button>
+        <div style="display:flex;">
+            <button class="btn-close" style="margin-right:15px;" onclick="abrirCalendario()">📅 Calendário</button>
+            <button class="btn-add" onclick="abrirModal()">+ Nova Ordem de Produção</button>
+        </div>
     </header>
 
     <div class="kanban-board" id="board">
@@ -93,6 +96,7 @@
         <div class="modal-content">
             <h2 style="margin-top:0; color:var(--text-main);">Cadastrar O.P.</h2>
             
+            <!-- ETAPA 1: Identificação do Cliente -->
             <div class="form-group">
                 <label>1. Cadastrar novo cliente ou usar existente</label>
                 <div class="form-row">
@@ -109,55 +113,102 @@
             </div>
             
             <input type="hidden" id="clienteId">
-            <div class="form-group"><input type="text" id="nome" placeholder="Nome do Cliente"></div>
+            <div class="form-group"><input type="text" id="nome" placeholder="Nome do Cliente" onkeyup="verificarClientePreenchido()"></div>
             <div class="form-group"><input type="email" id="email" placeholder="E-mail"></div>
             <div class="form-group"><input type="text" id="endereco" placeholder="Endereço de Entrega completo"></div>
             
-            <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
-            
-            <label>2. Carrinho de Quadros</label>
-            <div class="form-row form-group">
-                <div style="flex:1">
-                    <select id="tamanho"><option value="A4">A4 (R$ 30,00)</option><option value="A3">A3 (R$ 50,00)</option></select>
-                </div>
-                <div style="flex:2">
-                    <select id="moldura"><option value="ALUMINIO">Alumínio (R$ 50,00)</option><option value="MADEIRA_BRANCA">Mad. Branca (R$ 100,00)</option><option value="MADEIRA_PRETA">Mad. Preta (R$ 100,00)</option></select>
-                </div>
-                <div style="flex:1"><input type="number" id="qtd" value="1" min="1"></div>
+            <div style="display:flex; justify-content:space-between; margin-top:20px;" id="rodape-fechar">
+                <button class="btn-close" onclick="fecharModal()">Cancelar Processo</button>
             </div>
-            <button class="btn-close" style="width:100%; border-style:dashed; margin-bottom:10px;" onclick="adicionarItem()">+ Inserir Quadro na O.P.</button>
-            <div class="items-list" id="lista-carrinho">O carrinho está vazio.</div>
-            
-            <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
 
-            <label>3. Faturamento</label>
-            <div class="form-row form-group">
-                <div style="flex:1">
-                    <!-- Repare que chamamos atualizarTotalTudo sempre que o pagamento muda para aplicar juros! -->
-                    <select id="pagamento" onchange="atualizarTotalTudo()">
-                        <optgroup label="À Vista">
-                            <option value="A_VISTA_PIX">Pix</option>
-                            <option value="A_VISTA_DINHEIRO">Dinheiro</option>
-                            <option value="A_VISTA_DEBITO">Débito</option>
-                            <option value="A_VISTA_BOLETO">Boleto (À vista)</option>
-                        </optgroup>
-                        <optgroup label="Parcelado">
-                            <option value="PARCELADO_CARTAO">Cartão de Crédito</option>
-                            <option value="PARCELADO_BOLETO">Boleto Bancário</option>
-                        </optgroup>
-                    </select>
+            <!-- ETAPAS 2 e 3 (Ocultas inicialmente) -->
+            <div id="secao-carrinho" style="display:none; transition: all 0.3s ease-in-out;">
+                <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+                
+                <label>2. Carrinho de Quadros</label>
+                <div class="form-row form-group">
+                    <div style="flex:1">
+                        <select id="tamanho"><option value="A4">A4 (R$ 30,00)</option><option value="A3">A3 (R$ 50,00)</option></select>
+                    </div>
+                    <div style="flex:2">
+                        <select id="moldura"><option value="ALUMINIO">Alumínio (R$ 50,00)</option><option value="MADEIRA_BRANCA">Mad. Branca (R$ 100,00)</option><option value="MADEIRA_PRETA">Mad. Preta (R$ 100,00)</option></select>
+                    </div>
+                    <div style="flex:1"><input type="number" id="qtd" value="1" min="1"></div>
                 </div>
-                <div style="flex:1">
-                    <input type="number" id="parcelas" value="1" min="1" max="12" onchange="atualizarTotalTudo()" title="Qtd de Parcelas">
+                <button class="btn-close" style="width:100%; border-style:dashed; margin-bottom:10px;" onclick="adicionarItem()">+ Inserir Quadro na O.P.</button>
+                <div class="items-list" id="lista-carrinho">O carrinho está vazio.</div>
+                
+                <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+
+                <label>3. Faturamento</label>
+                <div class="form-row form-group">
+                    <div style="flex:1">
+                        <select id="pagamento" onchange="atualizarTotalTudo()">
+                            <optgroup label="À Vista">
+                                <option value="A_VISTA_PIX">Pix</option>
+                                <option value="A_VISTA_DINHEIRO">Dinheiro</option>
+                                <option value="A_VISTA_DEBITO">Débito</option>
+                                <option value="A_VISTA_BOLETO">Boleto (À vista)</option>
+                            </optgroup>
+                            <optgroup label="Parcelado">
+                                <option value="PARCELADO_CARTAO">Cartão de Crédito</option>
+                                <option value="PARCELADO_BOLETO">Boleto Bancário</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <!-- Item 3: Oculto até ser parcelado -->
+                    <div style="flex:1" id="div-parcelas" style="display:none;">
+                        <input type="number" id="parcelas" value="1" min="1" max="12" onchange="atualizarTotalTudo()" title="Qtd de Parcelas">
+                    </div>
+                </div>
+                
+                <div class="total-display">R$ <span id="total-estimado">0.00</span></div>
+                <div id="detalhe-parcela" style="font-size:14px; color:var(--text-light); text-align:right; margin-top:-15px; margin-bottom:20px; min-height:16px; font-weight:600;"></div>
+                
+                <!-- Prazo estimado (Item 5) -->
+                <div style="background-color: var(--column-bg); padding: 14px; border-radius: 8px; margin-top: 10px; text-align: center; border: 1px solid var(--border); font-size: 14px; color: var(--text-main);">
+                    Prazo Estimado da Produção: <strong id="prazo-dias" style="color: var(--primary); font-size: 16px;">0 dias</strong>
+                </div>
+                
+                <div class="form-group" style="margin-top:15px;">
+                    <label>Anotação para o Calendário de Entregas (Opcional)</label>
+                    <input type="text" id="obs-calendario" placeholder="Ex: Cliente tem pressa. Entregar até 12h.">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:20px;">
+                    <button class="btn-close" onclick="fecharModal()">Cancelar OP</button>
+                    <button class="btn-add" onclick="salvarOP()">Gerar e Salvar O.P.</button>
                 </div>
             </div>
-            
-            <div class="total-display">R$ <span id="total-estimado">0.00</span></div>
-            <div id="detalhe-parcela" style="font-size:14px; color:var(--text-light); text-align:right; margin-top:-15px; margin-bottom:20px; min-height:16px; font-weight:600;"></div>
-            
-            <div style="display:flex; justify-content:space-between; margin-top:20px;">
-                <button class="btn-close" onclick="fecharModal()">Cancelar</button>
-                <button class="btn-add" onclick="salvarOP()">Aprovar O.P.</button>
+        </div>
+    </div>
+
+    <!-- Modal Detalhes OP (Módulo 3: Clique no Kanban) -->
+    <div class="modal" id="modalDetalhes">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:var(--text-main);" id="detalhe-titulo">Detalhes da OP</h2>
+                <button onclick="fecharModalDetalhes()" style="background:var(--bg); border:1px solid var(--border); padding:5px 12px; border-radius:6px; cursor:pointer;" class="btn-close">Fechar</button>
+            </div>
+            <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+            <div id="detalhe-conteudo" style="font-size:14px; line-height:1.6; color:var(--text-main);">
+                <!-- Preenchido via Javascript Mágico dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Calendário (Módulo 4) -->
+    <div class="modal" id="modalCalendario">
+        <div class="modal-content" style="width: 800px; max-width: 95%;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:var(--text-main);">📅 Calendário de Entregas</h2>
+                <button onclick="document.getElementById('modalCalendario').style.display='none'" class="btn-close">Fechar</button>
+            </div>
+            <div style="margin-top:10px; font-size:13px; color:var(--text-light);">
+                Visão de 14 dias (Vermelho = Produção | Verde = Entregue/Finalizado). O prazo é criado automaticamente na nova OP.
+            </div>
+            <div id="calendar-grid" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:10px; margin-top:20px;">
+                <!-- Dinâmico JS -->
             </div>
         </div>
     </div>
@@ -173,10 +224,30 @@
             document.getElementById('tel').value = '';
             document.getElementById('email').value = '';
             document.getElementById('endereco').value = '';
+            document.getElementById('secao-carrinho').style.display = 'none';
+            document.getElementById('rodape-fechar').style.display = 'flex';
+            document.getElementById('div-parcelas').style.display = 'none'; // Item 3
+            document.getElementById('pagamento').value = 'A_VISTA_PIX';
+            document.getElementById('parcelas').value = 1;
+            document.getElementById('obs-calendario').value = '';
             itensCarrinho = [];
             atualizarCarrinhoUI();
         }
         function fecharModal() { document.getElementById('modalOP').style.display = 'none'; }
+        
+        function fecharModalDetalhes() { document.getElementById('modalDetalhes').style.display = 'none'; }
+
+        // Módulo 2 - Item 1: Liberar resto do form se tiver nome
+        function verificarClientePreenchido() {
+            const n = document.getElementById('nome').value;
+            if(n.length > 2) {
+                document.getElementById('secao-carrinho').style.display = 'block';
+                document.getElementById('rodape-fechar').style.display = 'none';
+            } else {
+                document.getElementById('secao-carrinho').style.display = 'none';
+                document.getElementById('rodape-fechar').style.display = 'flex';
+            }
+        }
 
         function buscarCliente() {
             const tel = document.getElementById('tel').value;
@@ -186,9 +257,10 @@
                     if(text) {
                         const c = JSON.parse(text);
                         preencherFormCliente(c.id, c.nome, c.telefone, c.email, c.endereco);
-                        alert("🎉 Cliente Recorrente encontrado!");
+                        alert("🎉 Cliente Encontrado!");
+                        verificarClientePreenchido();
                     } else {
-                        alert("Telefone novo. Pode preencher os dados para um novo cadastro!");
+                        alert("Não encontrado. Preencha os dados e o formulário abrirá.");
                     }
                 });
         }
@@ -225,20 +297,29 @@
             document.getElementById('email').value = email || '';
             document.getElementById('endereco').value = endereco || '';
             document.getElementById('listaClientesBox').style.display = 'none';
+            verificarClientePreenchido(); // Libera logo o form!
         }
 
-        // Adiciona quadros visuais no form
         function adicionarItem() {
             const tam = document.getElementById('tamanho').value;
-            const mol = document.getElementById('moldura').value;
+            const molText = document.getElementById('moldura').options[document.getElementById('moldura').selectedIndex].text;
+            const molVal = document.getElementById('moldura').value;
             const qtd = parseInt(document.getElementById('qtd').value);
             
-            // Calcula o preco unitario local para exibicao (igual o back faz)
             let precoUnitario = 0;
             if(tam === 'A3') precoUnitario += 50; else precoUnitario += 30;
-            if(mol.includes('MADEIRA')) precoUnitario += 100; else precoUnitario += 50;
+            if(molVal.includes('MADEIRA')) precoUnitario += 100; else precoUnitario += 50;
             
-            itensCarrinho.push({ tamanho: tam, tipoMoldura: mol, quantidade: qtd, precoUnitario: precoUnitario });
+            // Item 4: Unificar textos
+            const nomeUnificado = `${molText.split('(')[0].trim()} ${tam}`;
+            
+            itensCarrinho.push({ 
+                tamanho: tam, 
+                tipoMoldura: molVal, 
+                descricaoFina: nomeUnificado,
+                quantidade: qtd, 
+                valorUnitario: precoUnitario 
+            });
             atualizarCarrinhoUI();
         }
 
@@ -246,27 +327,46 @@
             const div = document.getElementById('lista-carrinho');
             if(itensCarrinho.length === 0) { div.innerHTML = 'Nenhum quadro adicionado.'; }
             else {
+                // Módulo 2 - Item 4: Exibição unificada e mais elegante
                 div.innerHTML = itensCarrinho.map((it) => 
-                    `<div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <span>${it.quantidade}x Quadro ${it.tamanho} <span style="font-size:12px;color:var(--text-light)">${it.tipoMoldura.replace('_',' ')}</span></span>
-                        <span style="color:var(--text-light); font-weight:600;">R$ ${(it.precoUnitario * it.quantidade).toFixed(2)}</span>
+                    `<div style="display:flex; justify-content:space-between; margin-bottom:6px; padding:4px 0; border-bottom: 1px dotted var(--border);">
+                        <span>${it.quantidade}x <strong>${it.descricaoFina}</strong> <span style="font-size:11px; color:var(--text-light)">(R$ ${it.valorUnitario.toFixed(2)})</span></span>
+                        <span style="color:var(--text-light); font-weight:600;">R$ ${(it.valorUnitario * it.quantidade).toFixed(2)}</span>
                     </div>`
                 ).join('');
             }
-            atualizarTotalTudo(); // Recalcula o total sempre que colocar um no carrinho
+            atualizarTotalTudo();
         }
 
-        // Simula no VisualHTML a exata conta que o SpringBoot Service fará no Banco!
         function atualizarTotalTudo() {
             let soma = 0;
+            let totalQuadros = 0;
             itensCarrinho.forEach(it => {
-                soma += (it.precoUnitario * it.quantidade);
+                soma += (it.valorUnitario * it.quantidade);
+                totalQuadros += it.quantidade;
             });
+            
             const pag = document.getElementById('pagamento').value;
-            const par = parseInt(document.getElementById('parcelas').value);
-            if(pag.startsWith('PARCELADO') && par >= 5) {
-                soma = soma * 1.032; // Juros de verdade 3.2%
+            let par = parseInt(document.getElementById('parcelas').value);
+            
+            // Módulo 2 - Item 3: Só aparece parcela se for parcelado!
+            const divPar = document.getElementById('div-parcelas');
+            if(pag.startsWith('PARCELADO')) {
+                divPar.style.display = 'block';
+            } else {
+                divPar.style.display = 'none';
+                document.getElementById('parcelas').value = 1;
+                par = 1;
             }
+
+            // Módulo 2 - Item 2: Juros e Aumentos
+            if(pag.startsWith('PARCELADO') && par >= 5) {
+                soma = soma * 1.032; // Juros base de 3.2%
+            }
+            if(pag.startsWith('PARCELADO') && par >= 9) {
+                soma = soma * 1.0013; // Aumenta 0.13% a partir da nona
+            }
+            
             document.getElementById('total-estimado').innerText = soma.toFixed(2);
             
             const divParcela = document.getElementById('detalhe-parcela');
@@ -276,14 +376,25 @@
             } else {
                 divParcela.innerText = '';
             }
+
+            // Módulo 2 - Item 5: Prazo de Entrega Estimado
+            const lblPrazo = document.getElementById('prazo-dias');
+            if(totalQuadros === 0) {
+                lblPrazo.innerText = '0 dias';
+                lblPrazo.style.color = 'var(--text-light)';
+            } else if (totalQuadros <= 4) {
+                lblPrazo.innerText = 'Até 4 dias úteis';
+                lblPrazo.style.color = 'var(--color-faturamento)';
+            } else {
+                lblPrazo.innerText = 'Até 6 dias úteis';
+                lblPrazo.style.color = 'var(--color-producao)';
+            }
         }
 
-        // Manda o pacotasso de informações mastigadas para o nosso Java Salvar e calcular oficial.
         function salvarOP() {
             if(itensCarrinho.length === 0) { alert("Adicione quadros na OP!"); return; }
             if(!document.getElementById('nome').value) { alert("Nome obrigatório!"); return; }
 
-            // Monta o Cliente
             const cliente = {
                 nome: document.getElementById('nome').value,
                 telefone: document.getElementById('tel').value,
@@ -293,16 +404,24 @@
             const cId = document.getElementById('clienteId').value;
             if(cId) cliente.id = parseInt(cId);
 
-            // Monta a Ordem de Produção Completa (Anexando o cliente e o carrinho nela)
+            // Módulo 4 vai usar esse prazo, mandando via payload pra abstrairmos depois
+            let totalQuadros = itensCarrinho.reduce((a, it) => a + it.quantidade, 0);
+            let prazoParaJava = totalQuadros <= 4 ? 4 : 6;
+
+            let dt = new Date();
+            dt.setDate(dt.getDate() + prazoParaJava);
+            const dataIso = dt.toISOString().split('T')[0];
+
             const op = {
                 cliente: cliente,
                 canalAtendimento: 'BALCAO', 
                 formaPagamento: document.getElementById('pagamento').value,
                 parcelas: parseInt(document.getElementById('parcelas').value),
-                itens: itensCarrinho
+                itens: itensCarrinho,
+                dataEntregaEstimada: dataIso,
+                observacaoCalendario: document.getElementById('obs-calendario').value
             };
 
-            // Conversa com nossa API do OrdemProducaoController
             fetch('/ops', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -310,7 +429,7 @@
             }).then(r => r.json()).then(novaOp => {
                 alert("✨ O.P. #" + novaOp.id + " faturada com sucesso no valor de R$" + novaOp.valorTotal);
                 fecharModal();
-                carregarKanban(); // Atualiza a tela Drag and Drop
+                carregarKanban();
             });
         }
 
@@ -319,14 +438,13 @@
                 document.getElementById(id).innerHTML = '';
             });
 
-            fetch('/ops') // Puxa as OPs do banco de dados (GET)
+            fetch('/ops')
                 .then(r => r.json())
                 .then(ops => {
                     ops.forEach(op => {
                         const col = document.getElementById(op.etapaAtual || 'ATENDIMENTO');
                         if (col) {
                             const totalQuadros = op.itens ? op.itens.reduce((acc, it) => acc + it.quantidade, 0) : 0;
-                            // Cor da borda
                             let corBorda = 'var(--primary)';
                             if(op.etapaAtual === 'ATENDIMENTO') corBorda = 'var(--color-atendimento)';
                             if(op.etapaAtual === 'FATURAMENTO') corBorda = 'var(--color-faturamento)';
@@ -338,13 +456,12 @@
                             const codShow = op.codigoRastreio ? op.codigoRastreio : '#OP-'+op.id;
                             
                             let formatoPtBr = op.formaPagamento || 'S/N';
-                            formatoPtBr = formatoPtBr.replace(/_/g, ' '); // Tira os underlines da visualização
+                            formatoPtBr = formatoPtBr.replace(/_/g, ' '); 
                             
-                            // Cria as cartinhas HTML
                             col.innerHTML += `
-                                <div class="card" style="border-left-color: ${corBorda}; position: relative;" draggable="true" ondragstart="drag(event, ${op.id})" id="card-${op.id}">
+                                <div class="card" style="border-left-color: ${corBorda}; position: relative;" draggable="true" ondragstart="drag(event, ${op.id})" id="card-${op.id}" onclick="abrirDetalhesOP(${op.id})">
                                     <div style="position:absolute; top:8px; right:8px; display:flex; gap:8px;">
-                                        <button onclick="excluirOP(${op.id})" title="Excluir O.P." style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px;">🗑️</button>
+                                        <button onclick="event.stopPropagation(); excluirOP(${op.id})" title="Excluir O.P." style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px;">🗑️</button>
                                     </div>
                                     <div class="card-header" style="margin-right:25px;">
                                         <span style="background:var(--bg); padding:2px 6px; border-radius:4px; font-weight:700; color:var(--primary); font-family:monospace; font-size:14px;">${codShow}</span>
@@ -366,55 +483,112 @@
                 });
         }
 
-        // --- Lógica Avançada HTML5 Drag and Drop e OK ---
-        function toggleOk(ev, opId) {
-            const isOk = ev.target.checked;
-            fetch('/ops/' + opId + '/ok', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ok: isOk})
-            }).then(r => {
-                if(!r.ok) alert("Erro ao marcar etapa OK");
+        // Módulo 3 - Visualizar Detalhes
+        function abrirDetalhesOP(id) {
+            fetch('/ops')
+            .then(r => r.json())
+            .then(ops => {
+                const op = ops.find(o => o.id === id);
+                if(!op) return;
+                document.getElementById('modalDetalhes').style.display = 'flex';
+                
+                // Mapear Cores do Badgetinho do Status
+                const badgetinhas = {
+                    'ATENDIMENTO': '<span style="background:var(--color-atendimento); color:white; padding: 2px 6px; border-radius:4px; font-size:12px;">Atendimento</span>',
+                    'FATURAMENTO': '<span style="background:var(--color-faturamento); color:white; padding: 2px 6px; border-radius:4px; font-size:12px;">Faturamento</span>',
+                    'PRODUCAO': '<span style="background:var(--color-producao); color:white; padding: 2px 6px; border-radius:4px; font-size:12px;">Produção</span>',
+                    'EXPEDICAO': '<span style="background:var(--color-expedicao); color:white; padding: 2px 6px; border-radius:4px; font-size:12px;">Expedição</span>',
+                    'ENTREGA': '<span style="background:var(--color-entrega); color:white; padding: 2px 6px; border-radius:4px; font-size:12px;">Entrega</span>'
+                };
+                const statusBadge = badgetinhas[op.etapaAtual || 'ATENDIMENTO'];
+
+                document.getElementById('detalhe-titulo').innerHTML = `Ordem de Produção #${op.id} ${statusBadge}`;
+                
+                let itensHtml = op.itens.map(it => `<li style="margin-bottom:4px;">${it.quantidade}x Moldura ${it.tipoMoldura.replace(/_/g,' ')} ${it.tamanho} <span style="color:var(--text-light)">(R$ ${it.valorUnitario || it.precoUnitario || 0})</span></li>`).join('');
+                
+                document.getElementById('detalhe-conteudo').innerHTML = `
+                    <div style="background:var(--bg); padding:10px; border-radius:8px; margin-bottom:15px; border:1px solid var(--border);">
+                        <p style="margin:4px 0;"><strong>👤 Cliente:</strong> ${op.cliente ? op.cliente.nome : 'S/C'}</p>
+                        <p style="margin:4px 0;"><strong>📞 Telefone:</strong> ${op.cliente ? op.cliente.telefone : ''}</p>
+                        <p style="margin:4px 0;"><strong>📍 Endereço de Entrega:</strong> ${op.cliente ? op.cliente.endereco : 'Não preenchido'}</p>
+                    </div>
+                    <hr style="border:0; border-top:1px dashed var(--border); margin:15px 0;">
+                    <p style="text-transform:uppercase; font-size:12px; font-weight:700; color:var(--text-light);">📦 Itens Encomendados:</p>
+                    <ul style="margin-top:5px; padding-left:20px; color:var(--primary); font-weight:600;">${itensHtml}</ul>
+                    <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+                    <p><strong>💰 Total da OP:</strong> <span style="color:#10b981; font-weight:700; font-size:18px;">R$ ${op.valorTotal.toFixed(2)}</span></p>
+                    <p><strong>💳 Forma de Pagamento:</strong> ${(op.formaPagamento || '').replace(/_/g, ' ')} (${op.parcelas}x)</p>
+                    <p><strong>🚚 Rastreio / Referência:</strong> ${op.codigoRastreio || 'Ainda não enviado'}</p>
+                `;
             });
         }
 
-        // --- Botão Excluir O.P ---
+        // Módulo 4 - Calendário Visual
+        function abrirCalendario() {
+            document.getElementById('modalCalendario').style.display = 'flex';
+            fetch('/ops').then(r => r.json()).then(ops => {
+                const today = new Date();
+                let html = '';
+                for(let i = 0; i < 14; i++) {
+                    let d = new Date();
+                    d.setDate(today.getDate() + i);
+                    let dateStr = d.toISOString().split('T')[0];
+                    // Procura OPs desse dia
+                    let diaOps = ops.filter(o => o.dataEntregaEstimada === dateStr);
+                    
+                    let cardsHtml = diaOps.map(o => {
+                        let isGreen = o.etapaAtual === 'ENTREGA';
+                        let color = isGreen ? '#dcfce7' : '#fee2e2';
+                        let border = isGreen ? '#10b981' : '#ef4444';
+                        let textC = isGreen ? '#065f46' : '#991b1b';
+                        return `<div style="background:${color}; border:1px solid ${border}; color:${textC}; padding:6px; margin:4px 0; border-radius:4px; font-size:11px; cursor:pointer;" onclick="abrirDetalhesOP(${o.id}); document.getElementById('modalCalendario').style.display='none';">
+                            <strong>#${o.id}</strong> - ${o.cliente?o.cliente.nome:'S/C'}<br>
+                            <span style="font-size:10px">${o.observacaoCalendario || ''}</span>
+                        </div>`;
+                    }).join('');
+                    
+                    html += `<div style="border:1px solid var(--border); padding:10px; border-radius:6px; min-height:100px; background:var(--surface);">
+                        <div style="font-weight:bold; font-size:13px; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:5px;">
+                            ${d.toLocaleDateString('pt-BR').substring(0,5)}
+                        </div>
+                        ${cardsHtml}
+                    </div>`;
+                }
+                document.getElementById('calendar-grid').innerHTML = html;
+            });
+        }
+
+        function toggleOk(ev, opId) {
+            const isOk = ev.target.checked;
+            fetch('/ops/' + opId + '/ok', {
+                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ok: isOk})
+            }).then(r => { if(!r.ok) alert("Erro ao marcar etapa OK"); });
+        }
+
         function excluirOP(opId) {
             if(confirm("Tem certeza que deseja apagar essa O.P permanentemente?")) {
-                fetch('/ops/' + opId, {
-                    method: 'DELETE'
-                }).then(r => {
-                    if(r.ok) carregarKanban();
-                    else alert("Erro ao excluir!");
+                fetch('/ops/' + opId, { method: 'DELETE' }).then(r => {
+                    if(r.ok) carregarKanban(); else alert("Erro ao excluir!");
                 })
             }
         }
 
-        function drag(ev, opId) {
-            ev.dataTransfer.setData("opId", opId); // Guarda o ID no momento do clique (drag)
-        }
-        function allowDrop(ev) {
-            ev.preventDefault(); // Necessário por padrão da internet para permitir drop
-        }
+        function drag(ev, opId) { ev.dataTransfer.setData("opId", opId); }
+        function allowDrop(ev) { ev.preventDefault(); }
         function drop(ev, novaEtapa) {
             ev.preventDefault();
             const opId = ev.dataTransfer.getData("opId");
-            
-            // Fazemos o verbo PUT (Atualizar no banco) passando a etapa para onde ele soltou (Drop)
             fetch('/ops/' + opId + '/etapa', {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({novaEtapa: novaEtapa})
+                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({novaEtapa: novaEtapa})
             }).then(async r => {
-                if(!r.ok) { // Cai aqui se nossa trava de Segurança do Java recusar!
-                    const data = await r.json();
-                    alert(data.erro || "Erro de validação no Servidor Java!");
+                if(!r.ok) {
+                    const data = await r.json(); alert(data.erro || "Erro de validação no Servidor Java!");
                 }
-                carregarKanban(); // Atualiza a tela para confirmar de deu certo
+                carregarKanban();
             });
         }
 
-        window.onload = carregarKanban; // Carregar o Kanban logo que abre o Google Chrome
+        window.onload = carregarKanban;
     </script>
 </body>
 </html>

@@ -4,10 +4,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpSession;
+
 import com.quadrosforlife.gerenciadortarefas.model.OrdemProducao;
 import com.quadrosforlife.gerenciadortarefas.model.Cliente;
+import com.quadrosforlife.gerenciadortarefas.model.Usuario;
 import com.quadrosforlife.gerenciadortarefas.repository.OrdemProducaoRepository;
 import com.quadrosforlife.gerenciadortarefas.repository.ClienteRepository;
+import com.quadrosforlife.gerenciadortarefas.repository.UsuarioRepository;
 import com.quadrosforlife.gerenciadortarefas.service.PedidoService;
 
 import java.util.List;
@@ -25,7 +29,10 @@ public class OrdemProducaoController {
     private ClienteRepository clienteRepository;
 
     @Autowired
-    private PedidoService calculador; // Nosso matemático financeiro em ação!
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PedidoService calculador;
 
     @GetMapping
     public List<OrdemProducao> listarKanban() {
@@ -33,72 +40,91 @@ public class OrdemProducaoController {
     }
 
     @PostMapping
-    public OrdemProducao abrirNovaOP(@RequestBody OrdemProducao novaOp) {
-        // Regra 11 e 12 do seu pedido: Cliente novo x Cliente de casa
-        if (novaOp.getCliente() != null) {
-            if (novaOp.getCliente().getId() == null) {
-                // Se não tem ID, é gente nova, salva ele na tabela de clientes primeiro!
-                Cliente clienteSalvo = clienteRepository.save(novaOp.getCliente());
-                novaOp.setCliente(clienteSalvo);
-            }
+    public OrdemProducao abrirNovaOP(@RequestBody OrdemProducao novaOp, HttpSession session) {
+        if (novaOp.getCliente() != null && novaOp.getCliente().getId() == null) {
+            Cliente clienteSalvo = clienteRepository.save(novaOp.getCliente());
+            novaOp.setCliente(clienteSalvo);
         }
         
-        // Chama a nossa calculadora para aplicar juros e definir total (Regra 4 e 5)
         calculador.processarValoresDaOP(novaOp);
 
-        // Toda viagem no Kanban precisa começar no Início
         if (novaOp.getEtapaAtual() == null) {
             novaOp.setEtapaAtual("ATENDIMENTO");
         }
-        
         novaOp.setEtapaOk(false);
 
-        // Gerar o código sequencial/hash do pedido se não existir
         if (novaOp.getCodigoRastreio() == null) {
             String uuidCorrigido = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
             novaOp.setCodigoRastreio("#OP-" + uuidCorrigido);
         }
 
+        // Regra de Negocio: Setar o vendedor amarrado (User Req 1 Fase 4)
+        if (session != null && session.getAttribute("USER_ID") != null) {
+            Long userId = (Long) session.getAttribute("USER_ID");
+            Usuario u = usuarioRepository.findById(userId).orElse(null);
+            if (u != null) {
+                novaOp.setVendedorId(u.getId());
+                novaOp.setNomeVendedor(u.getLogin());
+            }
+        } else {
+            novaOp.setNomeVendedor("Sistema Master");
+        }
+
         return opRepository.save(novaOp);
     }
 
-    // Regra 3 e 7: Rotacionar pelo Kanban com validação!
     @PutMapping("/{id}/etapa")
-    public ResponseEntity<?> arrastarKanban(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> arrastarKanban(@PathVariable Long id, @RequestBody Map<String, String> body, HttpSession session) {
         String novaEtapa = body.get("novaEtapa");
         OrdemProducao op = opRepository.findById(id).orElseThrow();
         
-        // Trava de segurança: Se o vendedor arrastar pra Faturamento ou Produto sem o dinheiro
+        // Bloqueio do Invasor: O Vendedor puxando a OP pertence a ele? A Gerência escapa!
+        Long loggedUserId = (Long) session.getAttribute("USER_ID");
+        Boolean isAdmin = (Boolean) session.getAttribute("USER_ADMIN");
+        if (Boolean.FALSE.equals(isAdmin) && !loggedUserId.equals(op.getVendedorId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("erro", "✋ Acesso Negado: Apenas a vendedora '" + op.getNomeVendedor() + "' (criadora desta encomenda) ou uma Gerente pode manipular esta O.P!"));
+        }
+
         if ("FATURAMENTO".equals(novaEtapa) || "PRODUCAO".equals(novaEtapa)) {
             if (op.getFormaPagamento() == null || op.getFormaPagamento().trim().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("{\"erro\": \"Ops! Não dá para avançar antes de definir a Forma de Pagamento com o cliente!\"}");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("erro", "Ops! Não dá para avançar antes de definir a Forma de Pagamento com o cliente!"));
             }
         }
         
-        // Verifica se a etapa atual está marcada como OK para avançar
         if (!Boolean.TRUE.equals(op.getEtapaOk()) && !novaEtapa.equals(op.getEtapaAtual()) && !novaEtapa.equals("ATENDIMENTO")) {
-             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("{\"erro\": \"Você precisa marcar o card como OK antes de avançar para a próxima etapa!\"}");
+             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("erro", "Você precisa assinalar a O.P como 'Concluir' nesta etapa antes de empurrá-la à frente!"));
         }
         
         op.setEtapaAtual(novaEtapa); 
-        op.setEtapaOk(false); // Reseta para a próxima fase
+        op.setEtapaOk(false);
         return ResponseEntity.ok(opRepository.save(op));
     }
 
     @PutMapping("/{id}/ok")
-    public ResponseEntity<?> marcarEtapaOk(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+    public ResponseEntity<?> marcarEtapaOk(@PathVariable Long id, @RequestBody Map<String, Boolean> body, HttpSession session) {
         Boolean isOk = body.get("ok");
         OrdemProducao op = opRepository.findById(id).orElseThrow();
+
+        Long loggedUserId = (Long) session.getAttribute("USER_ID");
+        Boolean isAdmin = (Boolean) session.getAttribute("USER_ADMIN");
+        if (Boolean.FALSE.equals(isAdmin) && !loggedUserId.equals(op.getVendedorId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("erro", "✋ Acesso Negado: Apenas a vendedora '" + op.getNomeVendedor() + "' (dona da O.P.) pode concluir essas etapas!"));
+        }
+
         op.setEtapaOk(isOk);
         return ResponseEntity.ok(opRepository.save(op));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> excluirOP(@PathVariable Long id) {
-        // Encontra o objeto completo (com seus itens) e desvincula corretamente tudo para o banco não dar conflito
+    public ResponseEntity<?> excluirOP(@PathVariable Long id, HttpSession session) {
         OrdemProducao op = opRepository.findById(id).orElseThrow();
+
+        Long loggedUserId = (Long) session.getAttribute("USER_ID");
+        Boolean isAdmin = (Boolean) session.getAttribute("USER_ADMIN");
+        if (Boolean.FALSE.equals(isAdmin) && !loggedUserId.equals(op.getVendedorId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("erro", "🗑️ Acesso Negado: Apenas a própria '" + op.getNomeVendedor() + "' ou a Gerente Administrativa pode enviar essa ordem à lixeira!"));
+        }
+
         opRepository.delete(op);
         return ResponseEntity.ok().build();
     }

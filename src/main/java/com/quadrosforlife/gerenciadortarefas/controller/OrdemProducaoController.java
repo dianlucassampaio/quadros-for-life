@@ -7,17 +7,13 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpSession;
 
 import com.quadrosforlife.gerenciadortarefas.model.OrdemProducao;
-import com.quadrosforlife.gerenciadortarefas.model.Cliente;
-import com.quadrosforlife.gerenciadortarefas.model.Usuario;
 import com.quadrosforlife.gerenciadortarefas.repository.OrdemProducaoRepository;
-import com.quadrosforlife.gerenciadortarefas.repository.ClienteRepository;
-import com.quadrosforlife.gerenciadortarefas.repository.UsuarioRepository;
-import com.quadrosforlife.gerenciadortarefas.service.PedidoService;
+import com.quadrosforlife.gerenciadortarefas.service.OrdemProducaoService;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
+@SuppressWarnings("null")
 @RestController
 @RequestMapping("/ops")
 public class OrdemProducaoController {
@@ -25,14 +21,10 @@ public class OrdemProducaoController {
     @Autowired
     private OrdemProducaoRepository opRepository;
     
-    @Autowired
-    private ClienteRepository clienteRepository;
+
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private PedidoService calculador;
+    private OrdemProducaoService opService;
 
     @GetMapping
     public List<OrdemProducao> listarKanban() {
@@ -41,36 +33,8 @@ public class OrdemProducaoController {
 
     @PostMapping
     public OrdemProducao abrirNovaOP(@RequestBody OrdemProducao novaOp, HttpSession session) {
-        if (novaOp.getCliente() != null && novaOp.getCliente().getId() == null) {
-            Cliente clienteSalvo = clienteRepository.save(novaOp.getCliente());
-            novaOp.setCliente(clienteSalvo);
-        }
-        
-        calculador.processarValoresDaOP(novaOp);
-
-        if (novaOp.getEtapaAtual() == null) {
-            novaOp.setEtapaAtual("ATENDIMENTO");
-        }
-        novaOp.setEtapaOk(false);
-
-        if (novaOp.getCodigoRastreio() == null) {
-            String uuidCorrigido = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
-            novaOp.setCodigoRastreio("#OP-" + uuidCorrigido);
-        }
-
-        // Regra de Negocio: Setar o vendedor amarrado (User Req 1 Fase 4)
-        if (session != null && session.getAttribute("USER_ID") != null) {
-            Long userId = (Long) session.getAttribute("USER_ID");
-            Usuario u = usuarioRepository.findById(userId).orElse(null);
-            if (u != null) {
-                novaOp.setVendedorId(u.getId());
-                novaOp.setNomeVendedor(u.getLogin());
-            }
-        } else {
-            novaOp.setNomeVendedor("Sistema Master");
-        }
-
-        return opRepository.save(novaOp);
+        Long userId = session != null ? (Long) session.getAttribute("USER_ID") : null;
+        return opService.salvarNovaOp(novaOp, userId);
     }
 
     @PutMapping("/{id}/etapa")

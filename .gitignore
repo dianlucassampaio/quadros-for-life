@@ -20,4 +20,5 @@ HELP.md
 # Logs e arquivos de SO
 *.log
 *.sqlite
+*.db
 .DS_Store

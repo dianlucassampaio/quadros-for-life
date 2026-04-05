@@ -10,6 +10,7 @@ import com.quadrosforlife.gerenciadortarefas.model.Usuario;
 import com.quadrosforlife.gerenciadortarefas.repository.UsuarioRepository;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.mindrot.jbcrypt.BCrypt;
 
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +29,8 @@ public class AuthController {
         if (repository.count() == 0) {
             Usuario u = new Usuario();
             u.setLogin("admin");
-            u.setSenha("admin123");
+            // Generates hash instead of "admin123"
+            u.setSenha(BCrypt.hashpw("admin123", BCrypt.gensalt(10)));
             u.setIsAdmin(true);
             repository.save(u);
         }
@@ -40,17 +42,32 @@ public class AuthController {
         String senha = body.get("senha");
         
         Optional<Usuario> userOpt = repository.findByLogin(login);
-        if (userOpt.isPresent() && userOpt.get().getSenha().equals(senha)) {
+        if (userOpt.isPresent()) {
             Usuario u = userOpt.get();
-            // Carimba Passaporte Virtual Invisivel de sessao Spring Native
-            session.setAttribute("USER_ID", u.getId());
-            session.setAttribute("USER_ADMIN", u.getIsAdmin());
+            boolean senhaOk = false;
+            try {
+                senhaOk = BCrypt.checkpw(senha, u.getSenha());
+            } catch (IllegalArgumentException e) {
+                // Fallback para senhas salvas em texto plano antes da implementação do BCrypt
+                senhaOk = senha.equals(u.getSenha());
+                if (senhaOk) {
+                    // Atualiza no banco para o formato seguro hasheado
+                    u.setSenha(BCrypt.hashpw(senha, BCrypt.gensalt(10)));
+                    repository.save(u);
+                }
+            }
             
-            Map<String, Object> resp = new HashMap<>();
-            resp.put("id", u.getId());
-            resp.put("login", u.getLogin());
-            resp.put("isAdmin", u.getIsAdmin());
-            return ResponseEntity.ok(resp);
+            if (senhaOk) {
+                // Carimba Passaporte Virtual Invisivel de sessao Spring Native
+                session.setAttribute("USER_ID", u.getId());
+                session.setAttribute("USER_ADMIN", u.getIsAdmin());
+                
+                Map<String, Object> resp = new HashMap<>();
+                resp.put("id", u.getId());
+                resp.put("login", u.getLogin());
+                resp.put("isAdmin", u.getIsAdmin());
+                return ResponseEntity.ok(resp);
+            }
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("erro", "Credenciais Invalidas"));
     }
@@ -89,7 +106,7 @@ public class AuthController {
 
         Usuario v = new Usuario();
         v.setLogin(body.get("login"));
-        v.setSenha(body.get("senha"));
+        v.setSenha(BCrypt.hashpw(body.get("senha"), BCrypt.gensalt(10)));
         v.setIsAdmin(false); // Nasce mero mortal como vendedor
         repository.save(v);
         
